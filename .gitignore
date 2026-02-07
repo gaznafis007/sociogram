@@ -1,16 +1,70 @@
+# Dependencies
 node_modules/
+**/node_modules/
+
+# Build outputs
 dist/
-# .env
+build/
+web-build/
+*.tsbuildinfo
+
+# Environment files - NEVER commit these
+.env
+.env.*
 .env.local
-.env.*.local
+.env.development
+.env.production
+.env.test
+*.local
+
+# Logs
 *.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS files
 .DS_Store
+*.pem
+
+# IDEs
 .vscode/*
 !.vscode/extensions.json
 !.vscode/launch.json
 !.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# Backend specific
+backend/dist/
+backend/coverage/
+backend/.nyc_output/
+backend/firebase-key.json
+
+# App/Expo specific
+app/.expo/
+app/expo-env.d.ts
+app/app-example
+app/.kotlin/
+
+# Native builds (generated)
+app/ios/
+app/android/
+
+# Certificates & keys
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# Testing
 coverage/
 .nyc_output/
-yarn-error.log
-npm-debug.log
-firebase-key.json
+prd.md
