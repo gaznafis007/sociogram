@@ -101,7 +101,7 @@ export const getProfile = asyncHandler(async (req: AuthRequest, res: Response): 
   ResponseHandler.success(res, user.toJSON(), 'Profile retrieved successfully');
 });
 
-export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateProfile = asyncHandler(async (req: Request & AuthRequest, res: Response): Promise<void> => {
   if (!req.user) {
     throw new AuthenticationError();
   }
@@ -120,7 +120,7 @@ export const updateProfile = asyncHandler(async (req: AuthRequest, res: Response
   ResponseHandler.success(res, user.toJSON(), 'Profile updated successfully');
 });
 
-export const updateDeviceToken = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+export const updateDeviceToken = asyncHandler(async (req: Request & AuthRequest, res: Response): Promise<void> => {
   if (!req.user) {
     throw new AuthenticationError();
   }

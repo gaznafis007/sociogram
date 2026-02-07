@@ -8,7 +8,9 @@ import { asyncHandler } from '../middleware/error.middleware';
 import { notificationService } from '../services/notification.service';
 import { AuthRequest } from '../types';
 
-export const createPost = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+type AuthRequestWithBody = AuthRequest & Request;
+
+export const createPost = asyncHandler(async (req: AuthRequestWithBody, res: Response): Promise<void> => {
   if (!req.user) {
     throw new AuthenticationError();
   }
@@ -16,7 +18,7 @@ export const createPost = asyncHandler(async (req: AuthRequest, res: Response): 
   const body = createPostSchema.parse(req.body);
 
   const post = await Post.create({
-    author: req.user.userId,
+    author: new (require('mongoose').Types.ObjectId)(req.user.userId),
     content: body.content,
     tags: body.tags || [],
   });
@@ -70,7 +72,7 @@ export const getPostById = asyncHandler(async (req: Request, res: Response): Pro
   ResponseHandler.success(res, post, 'Post retrieved successfully');
 });
 
-export const updatePost = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+export const updatePost = asyncHandler(async (req: AuthRequestWithBody, res: Response): Promise<void> => {
   if (!req.user) {
     throw new AuthenticationError();
   }
@@ -97,7 +99,7 @@ export const updatePost = asyncHandler(async (req: AuthRequest, res: Response): 
   ResponseHandler.success(res, post, 'Post updated successfully');
 });
 
-export const deletePost = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+export const deletePost = asyncHandler(async (req: AuthRequestWithBody, res: Response): Promise<void> => {
   if (!req.user) {
     throw new AuthenticationError();
   }
@@ -119,7 +121,7 @@ export const deletePost = asyncHandler(async (req: AuthRequest, res: Response): 
   ResponseHandler.noContent(res, 'Post deleted successfully');
 });
 
-export const likePost = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+export const likePost = asyncHandler(async (req: AuthRequestWithBody, res: Response): Promise<void> => {
   if (!req.user) {
     throw new AuthenticationError();
   }
@@ -163,7 +165,7 @@ export const likePost = asyncHandler(async (req: AuthRequest, res: Response): Pr
   ResponseHandler.success(res, post, likeIndex > -1 ? 'Post unliked successfully' : 'Post liked successfully');
 });
 
-export const addComment = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+export const addComment = asyncHandler(async (req: AuthRequestWithBody, res: Response): Promise<void> => {
   if (!req.user) {
     throw new AuthenticationError();
   }
@@ -204,7 +206,7 @@ export const addComment = asyncHandler(async (req: AuthRequest, res: Response): 
   ResponseHandler.success(res, post, 'Comment added successfully');
 });
 
-export const deleteComment = asyncHandler(async (req: AuthRequest, res: Response): Promise<void> => {
+export const deleteComment = asyncHandler(async (req: AuthRequestWithBody, res: Response): Promise<void> => {
   if (!req.user) {
     throw new AuthenticationError();
   }
@@ -217,7 +219,7 @@ export const deleteComment = asyncHandler(async (req: AuthRequest, res: Response
     throw new NotFoundError('Post');
   }
 
-  const commentIndex = post.comments.findIndex((c) => c._id.toString() === commentId);
+  const commentIndex = post.comments.findIndex((c) => (c._id || (c as any).id).toString() === commentId);
 
   if (commentIndex === -1) {
     throw new NotFoundError('Comment');
