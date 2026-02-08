@@ -1,17 +1,55 @@
-export type Post = {
-  id: string;
+// Backend User type
+export type User = {
+  _id: string;
   username: string;
-  text: string;
-  likes: number;
-  comments: number;
-  timestamp: Date;
-  isLiked: boolean;
+  email: string;
+  fullName: string;
+  bio?: string;
+  profileImage?: string;
+  deviceToken?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
+// Backend Comment type
 export type Comment = {
-  id: string;
-  postId: string;
-  username: string;
-  text: string;
-  timestamp: Date;
+  _id: string;
+  author: User;
+  content: string;
+  createdAt: string;
+};
+
+// Backend Post type
+export type Post = {
+  _id: string;
+  author: User;
+  content: string;
+  tags?: string[];
+  likes: string[]; // Array of user IDs
+  comments: Comment[];
+  likeCount: number; // Virtual field
+  commentCount: number; // Virtual field
+  createdAt: string;
+  updatedAt: string;
+};
+
+// API Response types
+export type ApiResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T;
+  timestamp: string;
+};
+
+export type PaginatedResponse<T> = {
+  success: boolean;
+  message: string;
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  timestamp: string;
 };

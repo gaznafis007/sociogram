@@ -3,12 +3,6 @@ import UsernameFilter from "@/components/feed/UsernameFilter";
 import NotificationBell from "@/components/NotificationBell";
 import ErrorBanner from "@/components/ui/ErrorBanner";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  filterPostsByUsername,
-  getMockPosts,
-  getUnreadNotificationCount,
-  toggleMockLike,
-} from "@/data/mockData";
 import { Post } from "@/types/post";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -20,34 +14,39 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { postService } from "@/services/postService";
+import axios from "axios";
 
 export default function FeedScreen() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   const [posts, setPosts] = useState<Post[]>([]);
-  const [filteredPosts, setFilteredPosts] = useState<Post[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const loadPosts = useCallback(async () => {
     try {
-      const allPosts = await getMockPosts();
-      setPosts(allPosts);
-
+      const params: any = { page: 1, limit: 20 };
       if (searchQuery) {
-        const filtered = await filterPostsByUsername(searchQuery);
-        setFilteredPosts(filtered);
-      } else {
-        setFilteredPosts(allPosts);
+        params.username = searchQuery;
       }
+
+      const response = await postService.getPosts(params);
+      setPosts(response.data);
       setError(null);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load posts";
+      let message = "Failed to load posts";
+      if (axios.isAxiosError(err)) {
+        message = err.response?.data?.message || message;
+        if (!err.response) {
+          message = "Cannot connect to server";
+        }
+      }
       setError(message);
       console.error("Error loading posts:", err);
     } finally {
@@ -57,8 +56,9 @@ export default function FeedScreen() {
 
   const loadUnreadCount = useCallback(async () => {
     try {
-      const count = await getUnreadNotificationCount();
-      setUnreadCount(count);
+      // TODO: Implement notifications API
+      // For now, keep at 0
+      setUnreadCount(0);
     } catch (error) {
       console.error("Error loading unread count:", error);
     }
@@ -66,32 +66,41 @@ export default function FeedScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    setPage(1);
     await Promise.all([loadPosts(), loadUnreadCount()]);
     setRefreshing(false);
   };
 
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
-
-    if (query.trim()) {
-      const filtered = await filterPostsByUsername(query);
-      setFilteredPosts(filtered);
-    } else {
-      setFilteredPosts(posts);
-    }
+    setPage(1);
   };
 
   const handleLike = async (postId: string) => {
-    const updatedPosts = await toggleMockLike(postId);
-    setPosts(updatedPosts);
-
-    if (searchQuery) {
-      const filtered = updatedPosts.filter((p) =>
-        p.username.toLowerCase().includes(searchQuery.toLowerCase()),
+    try {
+      // Optimistic update
+      setPosts((prevPosts) =>
+        prevPosts.map((post) => {
+          if (post._id === postId) {
+            const isLiked = post.likes.includes(user?._id || "");
+            return {
+              ...post,
+              likes: isLiked
+                ? post.likes.filter((id) => id !== user?._id)
+                : [...post.likes, user?._id || ""],
+              likeCount: isLiked ? post.likeCount - 1 : post.likeCount + 1,
+            };
+          }
+          return post;
+        }),
       );
-      setFilteredPosts(filtered);
-    } else {
-      setFilteredPosts(updatedPosts);
+
+      // API call
+      await postService.likePost(postId);
+    } catch (err) {
+      console.error("Error liking post:", err);
+      // Revert optimistic update on error
+      await loadPosts();
     }
   };
 
@@ -104,7 +113,18 @@ export default function FeedScreen() {
       loadPosts();
       loadUnreadCount();
     }
-  }, [isAuthenticated, loadPosts, loadUnreadCount]);
+  }, [isAuthenticated, searchQuery]);
+
+  useEffect(() => {
+    if (searchQuery !== "") {
+      const debounce = setTimeout(() => {
+        loadPosts();
+      }, 500);
+      return () => clearTimeout(debounce);
+    } else {
+      loadPosts();
+    }
+  }, [searchQuery]);
 
   if (loading) {
     return (
@@ -135,7 +155,7 @@ export default function FeedScreen() {
 
       <UsernameFilter value={searchQuery} onChangeText={handleSearch} />
 
-      {filteredPosts.length === 0 ? (
+      {posts.length === 0 ? (
         <View className="flex-1 items-center justify-center">
           <Text className="text-gray-500 text-base">
             {searchQuery ? "No posts found" : "No posts yet"}
@@ -143,14 +163,14 @@ export default function FeedScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredPosts}
-          keyExtractor={(item) => item.id}
+          data={posts}
+          keyExtractor={(item) => item._id}
           renderItem={({ item }) => (
             <PostCard
               post={item}
               onLike={handleLike}
               onComment={handleComment}
-              onPress={() => router.push(`/post/${item.id}`)}
+              onPress={() => router.push(`/post/${item._id}`)}
             />
           )}
           refreshControl={

@@ -1,46 +1,72 @@
-import { createContext, ReactNode, useContext, useState } from "react";
-
-type User = {
-  username: string;
-  email: string;
-};
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useState,
+  useEffect,
+} from "react";
+import { authService } from "../services/authService";
+import { User } from "../types/post";
 
 type AuthContextType = {
   user: User | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (username: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  signup: (
+    username: string,
+    email: string,
+    password: string,
+    fullName: string,
+  ) => Promise<void>;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check for existing token on mount
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const checkAuth = async () => {
+    try {
+      const profile = await authService.getProfile();
+      setUser(profile);
+    } catch (error) {
+      // No valid token or token expired
+      setUser(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const login = async (email: string, password: string) => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Mock login - in real app, this would validate against backend
-    setUser({
-      username: email.split("@")[0], // Use email prefix as username
-      email,
-    });
+    const response = await authService.login({ email, password });
+    setUser(response.user);
   };
 
-  const signup = async (username: string, email: string, password: string) => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Mock signup - in real app, this would create user in backend
-    setUser({
+  const signup = async (
+    username: string,
+    email: string,
+    password: string,
+    fullName: string,
+  ) => {
+    const response = await authService.signup({
       username,
       email,
+      password,
+      fullName,
     });
+    setUser(response.user);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await authService.logout();
     setUser(null);
   };
 
@@ -49,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isAuthenticated: !!user,
+        isLoading,
         login,
         signup,
         logout,

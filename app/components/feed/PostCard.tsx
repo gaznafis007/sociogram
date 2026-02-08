@@ -2,6 +2,7 @@ import { Post } from "@/types/post";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Pressable, Text, View } from "react-native";
+import { useAuth } from "@/contexts/AuthContext";
 
 type PostCardProps = {
   post: Post;
@@ -10,7 +11,8 @@ type PostCardProps = {
   onPress?: () => void;
 };
 
-const formatTimestamp = (date: Date): string => {
+const formatTimestamp = (dateString: string): string => {
+  const date = new Date(dateString);
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
@@ -28,14 +30,17 @@ export default function PostCard({
   onComment,
   onPress,
 }: PostCardProps) {
+  const { user } = useAuth();
+  const isLiked = user ? post.likes.includes(user._id) : false;
+
   const handleLike = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    onLike(post.id);
+    onLike(post._id);
   };
 
   const handleComment = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onComment(post.id);
+    onComment(post._id);
   };
 
   return (
@@ -47,16 +52,16 @@ export default function PostCard({
             {/* Avatar */}
             <View className="w-10 h-10 rounded-full bg-blue-500 items-center justify-center">
               <Text className="text-white font-bold text-sm">
-                {post.username.charAt(0).toUpperCase()}
+                {post.author.username.charAt(0).toUpperCase()}
               </Text>
             </View>
 
             <View className="flex-1">
               <Text className="text-base font-bold text-gray-900">
-                {post.username}
+                {post.author.username}
               </Text>
               <Text className="text-xs text-gray-500">
-                {formatTimestamp(post.timestamp)}
+                {formatTimestamp(post.createdAt)}
               </Text>
             </View>
           </View>
@@ -65,7 +70,7 @@ export default function PostCard({
         {/* Post Text */}
         <View className="mb-4 ml-13">
           <Text className="text-[15px] text-gray-800 leading-6">
-            {post.text}
+            {post.content}
           </Text>
         </View>
 
@@ -77,16 +82,16 @@ export default function PostCard({
             className="flex-row items-center gap-2 py-1"
           >
             <MaterialCommunityIcons
-              name={post.isLiked ? "heart" : "heart-outline"}
+              name={isLiked ? "heart" : "heart-outline"}
               size={22}
-              color={post.isLiked ? "#EF4444" : "#6B7280"}
+              color={isLiked ? "#EF4444" : "#6B7280"}
             />
             <Text
               className={`text-sm font-semibold ${
-                post.isLiked ? "text-red-500" : "text-gray-600"
+                isLiked ? "text-red-500" : "text-gray-600"
               }`}
             >
-              {post.likes}
+              {post.likeCount}
             </Text>
           </Pressable>
 
@@ -101,7 +106,7 @@ export default function PostCard({
               color="#6B7280"
             />
             <Text className="text-sm font-semibold text-gray-600">
-              {post.comments}
+              {post.commentCount}
             </Text>
           </Pressable>
         </View>

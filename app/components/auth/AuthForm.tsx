@@ -17,6 +17,7 @@ type AuthFormProps = {
     email: string;
     password: string;
     username?: string;
+    fullName?: string;
   }) => Promise<void>;
 };
 
@@ -27,12 +28,14 @@ export default function AuthForm({ mode, onSubmit }: AuthFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
     username?: string;
+    fullName?: string;
     confirmPassword?: string;
   }>({});
 
@@ -46,11 +49,17 @@ export default function AuthForm({ mode, onSubmit }: AuthFormProps) {
       newErrors.email = "Invalid email format";
     }
 
-    // Password validation
+    // Password validation (match backend requirements)
     if (!password) {
       newErrors.password = "Password is required";
-    } else if (password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
+    } else if (password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters";
+    } else if (!/[A-Z]/.test(password)) {
+      newErrors.password = "Password must contain uppercase letter";
+    } else if (!/[a-z]/.test(password)) {
+      newErrors.password = "Password must contain lowercase letter";
+    } else if (!/[0-9]/.test(password)) {
+      newErrors.password = "Password must contain a number";
     }
 
     // Signup specific validations
@@ -59,6 +68,15 @@ export default function AuthForm({ mode, onSubmit }: AuthFormProps) {
         newErrors.username = "Username is required";
       } else if (username.length < 3) {
         newErrors.username = "Username must be at least 3 characters";
+      } else if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        newErrors.username =
+          "Username can only contain letters, numbers, - and _";
+      }
+
+      if (!fullName.trim()) {
+        newErrors.fullName = "Full name is required";
+      } else if (fullName.length > 100) {
+        newErrors.fullName = "Full name too long (max 100 characters)";
       }
 
       if (!confirmPassword) {
@@ -81,6 +99,7 @@ export default function AuthForm({ mode, onSubmit }: AuthFormProps) {
         email: email.trim(),
         password,
         username: isSignup ? username.trim() : undefined,
+        fullName: isSignup ? fullName.trim() : undefined,
       });
     } catch (error) {
       console.error("Auth error:", error);
@@ -120,14 +139,23 @@ export default function AuthForm({ mode, onSubmit }: AuthFormProps) {
           {/* Form Fields */}
           <View className="mb-6">
             {isSignup && (
-              <Input
-                label="Username"
-                value={username}
-                onChangeText={setUsername}
-                placeholder="Enter your username"
-                error={errors.username}
-                autoCapitalize="none"
-              />
+              <>
+                <Input
+                  label="Username"
+                  value={username}
+                  onChangeText={setUsername}
+                  placeholder="Enter your username"
+                  error={errors.username}
+                  autoCapitalize="none"
+                />
+                <Input
+                  label="Full Name"
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder="Enter your full name"
+                  error={errors.fullName}
+                />
+              </>
             )}
 
             <Input

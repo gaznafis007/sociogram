@@ -1,7 +1,6 @@
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
-import { createMockPost } from "@/data/mockData";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useRef, useState } from "react";
 import {
@@ -14,11 +13,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { postService } from "@/services/postService";
+import axios from "axios";
 
 const MAX_CHARS = 280;
 
 export default function CreateScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const textInputRef = useRef<TextInput>(null);
 
   const [text, setText] = useState("");
@@ -42,17 +44,21 @@ export default function CreateScreen() {
 
     setLoading(true);
     try {
-      if (!user?.username) {
-        Alert.alert("Error", "User not found");
-        return;
-      }
-
-      await createMockPost(user.username, text.trim());
+      await postService.createPost({ content: text.trim() });
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      Alert.alert("Success", "Post created successfully!");
+      Alert.alert("Success", "Post created successfully!", [
+        { text: "OK", onPress: () => router.push("/(tabs)") },
+      ]);
       setText("");
     } catch (error) {
-      Alert.alert("Error", "Failed to create post. Please try again.");
+      let errorMessage = "Failed to create post. Please try again.";
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || errorMessage;
+        if (!error.response) {
+          errorMessage = "Cannot connect to server";
+        }
+      }
+      Alert.alert("Error", errorMessage);
     } finally {
       setLoading(false);
     }

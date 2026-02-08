@@ -4,13 +4,7 @@ import CommentItem from "@/components/post/CommentItem";
 import ErrorBanner from "@/components/ui/ErrorBanner";
 import ErrorToast from "@/components/ui/ErrorToast";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  addMockCommentWithText,
-  getMockComments,
-  getMockPost,
-  toggleMockLike,
-} from "@/data/mockData";
-import { Comment, Post } from "@/types/post";
+import { Post } from "@/types/post";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -28,6 +22,8 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { postService } from "@/services/postService";
+import axios from "axios";
 
 export default function PostDetailScreen() {
   const router = useRouter();
@@ -36,7 +32,6 @@ export default function PostDetailScreen() {
   const insets = useSafeAreaInsets();
 
   const [post, setPost] = useState<Post | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,19 +43,19 @@ export default function PostDetailScreen() {
     if (!id) return;
 
     try {
-      const fetchedPost = await getMockPost(id);
-      if (fetchedPost) {
-        setPost(fetchedPost);
-
-        const fetchedComments = await getMockComments(id);
-        setComments(fetchedComments);
-        setError(null);
-      } else {
-        setError("Post not found");
-      }
+      const fetchedPost = await postService.getPost(id);
+      setPost(fetchedPost);
+      setError(null);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load post";
+      let message = "Failed to load post";
+      if (axios.isAxiosError(err)) {
+        message = err.response?.data?.message || message;
+        if (err.response?.status === 404) {
+          message = "Post not found";
+        } else if (!err.response) {
+          message = "Cannot connect to server";
+        }
+      }
       setError(message);
       console.error("Error loading post:", err);
     } finally {
@@ -71,18 +66,17 @@ export default function PostDetailScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const fetchedPost = await getMockPost(id!);
-      if (fetchedPost) {
-        setPost(fetchedPost);
-        const fetchedComments = await getMockComments(id!);
-        setComments(fetchedComments);
-        setError(null);
-      } else {
-        setError("Post not found");
-      }
+      const fetchedPost = await postService.getPost(id!);
+      setPost(fetchedPost);
+      setError(null);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load post";
+      let message = "Failed to load post";
+      if (axios.isAxiosError(err)) {
+        message = err.response?.data?.message || message;
+        if (!err.response) {
+          message = "Cannot connect to server";
+        }
+      }
       setError(message);
       console.error("Error loading post:", err);
     } finally {
@@ -95,21 +89,30 @@ export default function PostDetailScreen() {
   }, [loadPost]);
 
   const handleLike = async () => {
-    if (!post) return;
+    if (!post || !user) return;
 
     try {
-      await toggleMockLike(post.id);
+      // Optimistic update
+      const isLiked = post.likes.includes(user._id);
       setPost({
         ...post,
-        isLiked: !post.isLiked,
-        likes: post.isLiked ? post.likes - 1 : post.likes + 1,
+        likes: isLiked
+          ? post.likes.filter((id) => id !== user._id)
+          : [...post.likes, user._id],
+        likeCount: isLiked ? post.likeCount - 1 : post.likeCount + 1,
       });
+
+      await postService.likePost(post._id);
       setActionError(null);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to like post";
+      let message = "Failed to like post";
+      if (axios.isAxiosError(err)) {
+        message = err.response?.data?.message || message;
+      }
       setActionError(message);
       console.error("Error liking post:", err);
+      // Revert on error
+      await loadPost();
     }
   };
 
@@ -118,22 +121,20 @@ export default function PostDetailScreen() {
 
     setSubmitLoading(true);
     try {
-      const newComment = await addMockCommentWithText(
-        post.id,
-        user.username,
-        commentText,
-      );
-
-      setComments([...comments, newComment]);
-      setPost({
-        ...post,
-        comments: post.comments + 1,
+      const updatedPost = await postService.addComment(post._id, {
+        content: commentText.trim(),
       });
+      setPost(updatedPost);
       setCommentText("");
       setActionError(null);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to add comment";
+      let message = "Failed to add comment";
+      if (axios.isAxiosError(err)) {
+        message = err.response?.data?.message || message;
+        if (!err.response) {
+          message = "Cannot connect to server";
+        }
+      }
       setActionError(message);
       console.error("Error adding comment:", err);
     } finally {
@@ -214,8 +215,8 @@ export default function PostDetailScreen() {
           )}
 
           <FlatList
-            data={comments}
-            keyExtractor={(item) => item.id}
+            data={post.comments}
+            keyExtractor={(item) => item._id}
             ListHeaderComponent={
               <PostCard
                 post={post}

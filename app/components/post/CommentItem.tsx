@@ -5,7 +5,8 @@ type CommentItemProps = {
   comment: Comment;
 };
 
-const formatTimestamp = (date: Date): string => {
+const formatTimestamp = (dateString: string): string => {
+  const date = new Date(dateString);
   const now = new Date();
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
@@ -24,7 +25,7 @@ export default function CommentItem({ comment }: CommentItemProps) {
         {/* Avatar */}
         <View className="w-8 h-8 rounded-full bg-blue-500 items-center justify-center mt-1">
           <Text className="text-white font-bold text-xs">
-            {comment.username.charAt(0).toUpperCase()}
+            {comment.author.username.charAt(0).toUpperCase()}
           </Text>
         </View>
 
@@ -32,16 +33,16 @@ export default function CommentItem({ comment }: CommentItemProps) {
           {/* Comment Bubble */}
           <View className="bg-gray-100 rounded-2xl px-4 py-2.5">
             <Text className="font-semibold text-gray-900 text-sm mb-0.5">
-              {comment.username}
+              {comment.author.username}
             </Text>
             <Text className="text-[14px] text-gray-800 leading-5">
-              {comment.text}
+              {comment.content}
             </Text>
           </View>
 
           {/* Timestamp */}
           <Text className="text-xs text-gray-500 mt-1 ml-4">
-            {formatTimestamp(comment.timestamp)}
+            {formatTimestamp(comment.createdAt)}
           </Text>
         </View>
       </View>

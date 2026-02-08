@@ -1,9 +1,18 @@
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Stack } from "expo-router";
+import { View, ActivityIndicator } from "react-native";
 import "../global.css";
 
 function RootLayoutContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <Stack

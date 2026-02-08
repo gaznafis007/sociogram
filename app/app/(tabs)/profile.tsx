@@ -2,12 +2,13 @@ import PostCard from "@/components/feed/PostCard";
 import Button from "@/components/ui/Button";
 import ErrorBanner from "@/components/ui/ErrorBanner";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserPosts, getUserStats, toggleMockLike } from "@/data/mockData";
 import { Post } from "@/types/post";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, RefreshControl, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { postService } from "@/services/postService";
+import axios from "axios";
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -23,16 +24,31 @@ export default function ProfileScreen() {
     if (!user?.username) return;
 
     try {
-      const [userPosts, userStats] = await Promise.all([
-        getUserPosts(user.username),
-        getUserStats(user.username),
-      ]);
+      const response = await postService.getPosts({
+        username: user.username,
+        limit: 50,
+      });
+      const userPosts = response.data;
       setPosts(userPosts);
-      setStats(userStats);
+
+      // Calculate stats from posts
+      const totalLikes = userPosts.reduce(
+        (sum, post) => sum + post.likeCount,
+        0,
+      );
+      setStats({
+        postCount: userPosts.length,
+        totalLikes,
+      });
       setError(null);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load profile data";
+      let message = "Failed to load profile data";
+      if (axios.isAxiosError(err)) {
+        message = err.response?.data?.message || message;
+        if (!err.response) {
+          message = "Cannot connect to server";
+        }
+      }
       setError(message);
       console.error("Error loading user data:", err);
     } finally {
@@ -47,26 +63,53 @@ export default function ProfileScreen() {
   };
 
   const handleLike = async (postId: string) => {
-    const updatedPosts = await toggleMockLike(postId);
-    const userPostsUpdated = updatedPosts.filter(
-      (post) => post.username.toLowerCase() === user?.username.toLowerCase(),
-    );
-    setPosts(userPostsUpdated);
+    if (!user) return;
 
-    // Update stats
-    const totalLikes = userPostsUpdated.reduce(
-      (sum, post) => sum + post.likes,
-      0,
-    );
-    setStats((prev) => ({ ...prev, totalLikes }));
+    try {
+      // Optimistic update
+      setPosts((prevPosts) =>
+        prevPosts.map((post) => {
+          if (post._id === postId) {
+            const isLiked = post.likes.includes(user._id);
+            const newLikeCount = isLiked
+              ? post.likeCount - 1
+              : post.likeCount + 1;
+            return {
+              ...post,
+              likes: isLiked
+                ? post.likes.filter((id) => id !== user._id)
+                : [...post.likes, user._id],
+              likeCount: newLikeCount,
+            };
+          }
+          return post;
+        }),
+      );
+
+      await postService.likePost(postId);
+
+      // Update stats
+      setPosts((currentPosts) => {
+        const totalLikes = currentPosts.reduce(
+          (sum, post) => sum + post.likeCount,
+          0,
+        );
+        setStats((prev) => ({ ...prev, totalLikes }));
+        return currentPosts;
+      });
+    } catch (err) {
+      console.error("Error liking post:", err);
+      // Revert on error
+      await loadUserData();
+    }
   };
 
   const handleComment = (postId: string) => {
     router.push(`/post/${postId}`);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.replace("/login");
   };
 
@@ -83,7 +126,7 @@ export default function ProfileScreen() {
 
       <FlatList
         data={posts}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item._id}
         ListHeaderComponent={
           <View>
             {/* Error Banner */}
@@ -106,9 +149,10 @@ export default function ProfileScreen() {
 
               {/* User Info */}
               <Text className="text-2xl font-bold text-gray-900 mb-1">
-                {user?.username}
+                {user?.fullName || user?.username}
               </Text>
-              <Text className="text-gray-600 mb-6">{user?.email}</Text>
+              <Text className="text-gray-600 mb-1">@{user?.username}</Text>
+              <Text className="text-gray-500 text-sm mb-6">{user?.email}</Text>
 
               {/* Real Stats */}
               <View className="flex-row gap-12 w-full justify-center">
@@ -149,7 +193,7 @@ export default function ProfileScreen() {
             post={item}
             onLike={handleLike}
             onComment={handleComment}
-            onPress={() => router.push(`/post/${item.id}`)}
+            onPress={() => router.push(`/post/${item._id}`)}
           />
         )}
         refreshControl={
